@@ -24,11 +24,11 @@ os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;0"
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("-m", "--model", type=str, default='E:/vscode/MLPrac/FaceReconigtion/CV_Project/liveness.model',
+    ap.add_argument("-m", "--model", type=str, default='liveness.model',
                     help="path to trained model")
-    ap.add_argument("-l", "--le", type=str, default='E:/vscode/MLPrac/FaceReconigtion/CV_Project/le.pickle',
+    ap.add_argument("-l", "--le", type=str, default='le.pickle',
                     help="path to label encoder")
-    ap.add_argument("-d", "--detector", type=str, default='E:/vscode/MLPrac/FaceReconigtion/CV_Project/face_detector',
+    ap.add_argument("-d", "--detector", type=str, default='face_detector',
                     help="path to OpenCV's deep learning face detector")
     ap.add_argument("-c", "--confidence", type=float, default=0.5,
                     help="minimum probability to filter weak detections")
