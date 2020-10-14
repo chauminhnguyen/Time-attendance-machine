@@ -12,7 +12,7 @@ import src.align.detect_face as detect_face
 import numpy as np
 import cv2
 import collections
-from sklearn.svm import SVC
+# from sklearn.svm import SVC
 
 from keras.models import load_model
 from imutils.video import VideoStream
@@ -42,8 +42,8 @@ def main():
     CLASSIFIER_PATH = 'src/Models/facemodel.pkl'
     FACENET_MODEL_PATH = 'src/Models/20180402-114759.pb'
 
-    liveness_graph = tf.Graph()
     recog_graph = tf.Graph()
+    liveness_graph = tf.Graph()
 
     # Load The Custom Classifier
     with open(CLASSIFIER_PATH, 'rb') as file:
@@ -82,6 +82,8 @@ def main():
 
     le = pickle.loads(open(args["le"], "rb").read())
     cap = VideoStream(src=0).start()
+    #cap = cv2.VideoCapture('http://192.168.1.101:4747/video')
+
     while (True):
         cropped_array = []
         bb_array = []
@@ -107,9 +109,9 @@ def main():
                         bb[i][1] = det[i][1]
                         bb[i][2] = det[i][2]
                         bb[i][3] = det[i][3]
-                        print(bb[i][3]-bb[i][1])
-                        print(frame.shape[0])
-                        print((bb[i][3]-bb[i][1])/frame.shape[0])
+                        # print(bb[i][3]-bb[i][1])
+                        # print(frame.shape[0])
+                        # print((bb[i][3]-bb[i][1])/frame.shape[0])
                         if (bb[i][3]-bb[i][1])/frame.shape[0] > 0.25:
                             cropped = frame[bb[i][1]:bb[i]
                                             [3], bb[i][0]:bb[i][2], :]
@@ -130,8 +132,7 @@ def main():
                             best_class_probabilities = predictions[
                                 np.arange(len(best_class_indices)), best_class_indices]
                             best_name = class_names[best_class_indices[0]]
-                            print("Name: {}, Probability: {}".format(
-                                best_name, best_class_probabilities))
+                            # print("Name: {}, Probability: {}".format(best_name, best_class_probabilities))
 
                             if best_class_probabilities > 0.8:
                                 cropped_array.append(cropped)
@@ -192,6 +193,3 @@ def main():
 
     cap.release()
     cv2.destroyAllWindows()
-
-
-main()
