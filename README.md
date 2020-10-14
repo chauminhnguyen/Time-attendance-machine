@@ -7,4 +7,4 @@ Link models:
 		
 ### Run script:
 			
-		python time_clock.py
+		python app-gui.py
