@@ -1,94 +1,111 @@
-import tensorflow as tf
-from imutils.video import VideoStream
-
-import argparse
-import src.facenet as facenet
-import imutils
-import os
-import sys
-import math
-import pickle
-import src.align.detect_face as detect_face
-import numpy as np
-import cv2
+import time
+from keras.preprocessing.image import img_to_array
+from keras.models import load_model
 import collections
+import cv2
+import numpy as np
+import src.align.detect_face as detect_face
+import pickle
+import math
+import sys
+import os
+import imutils
+import src.facenet as facenet
+import argparse
+from imutils.video import VideoStream
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
+
+
 # from sklearn.svm import SVC
 
-from keras.models import load_model
-from imutils.video import VideoStream
-from keras.preprocessing.image import img_to_array
-import time
 
 os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;0"
 
+ap = argparse.ArgumentParser()
+ap.add_argument("-m", "--model", type=str, default='liveness.model',
+                help="path to trained model")
+ap.add_argument("-l", "--le", type=str, default='le.pickle',
+                help="path to label encoder")
+ap.add_argument("-d", "--detector", type=str, default='face_detector',
+                help="path to OpenCV's deep learning face detector")
+ap.add_argument("-c", "--confidence", type=float, default=0.5,
+                help="minimum probability to filter weak detections")
+args = vars(ap.parse_args())
+
+MINSIZE = 20
+THRESHOLD = [0.6, 0.7, 0.7]
+FACTOR = 0.709
+IMAGE_SIZE = 182
+INPUT_IMAGE_SIZE = 160
+CLASSIFIER_PATH = 'src/Models/facemodel.pkl'
+FACENET_MODEL_PATH = 'src/Models/20180402-114759.pb'
+
+
+class Recognition_Model:
+    @staticmethod
+    def loadmodel(path):
+        return loadmodel(path)
+
+    def ___init__(self, path):
+        self.model = self.loadmodel(path)
+        self.graph = tf.get_default_graph()
+
+    def predict(self, X):
+        with self.graph.as_default():
+            return self.model.predict(X)
+
+
+recog_graph = tf.Graph()
+liveness_graph = tf.Graph()
+
+# Load The Custom Classifier
+with open(CLASSIFIER_PATH, 'rb') as file:
+    recog_model, class_names = pickle.load(file)
+print("Custom Classifier, Successfully loaded")
+
+recog_sess = tf.Session(graph=recog_graph)
+liveness_sess = tf.Session(graph=liveness_graph)
+
+with recog_graph.as_default():
+    with recog_sess.as_default():
+        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.6)
+        # Load the model
+        print('Loading feature extraction model')
+        facenet.load_model(FACENET_MODEL_PATH)
+
+        # Get input and output tensors
+        images_placeholder = tf.get_default_graph().get_tensor_by_name("input:0")
+        embeddings = tf.get_default_graph().get_tensor_by_name("embeddings:0")
+        phase_train_placeholder = tf.get_default_graph().get_tensor_by_name("phase_train:0")
+        embedding_size = embeddings.get_shape()[1]
+
+        pnet, rnet, onet = detect_face.create_mtcnn(
+            recog_sess, "src/align")
+
+        people_detected = set()
+        person_detected = collections.Counter()
+        recog_init = tf.local_variables_initializer()
+
+# Load model nhan dien fake/real
+print("[INFO] loading liveness detector...")
+with liveness_graph.as_default():
+    with liveness_sess.as_default():
+        liveness_model = load_model(args["model"])
+        liveness_init = tf.local_variables_initializer()
+
+le = pickle.loads(open(args["le"], "rb").read())
+
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("-m", "--model", type=str, default='liveness.model',
-                    help="path to trained model")
-    ap.add_argument("-l", "--le", type=str, default='le.pickle',
-                    help="path to label encoder")
-    ap.add_argument("-d", "--detector", type=str, default='face_detector',
-                    help="path to OpenCV's deep learning face detector")
-    ap.add_argument("-c", "--confidence", type=float, default=0.5,
-                    help="minimum probability to filter weak detections")
-    args = vars(ap.parse_args())
-
-    MINSIZE = 20
-    THRESHOLD = [0.6, 0.7, 0.7]
-    FACTOR = 0.709
-    IMAGE_SIZE = 182
-    INPUT_IMAGE_SIZE = 160
-    CLASSIFIER_PATH = 'src/Models/facemodel.pkl'
-    FACENET_MODEL_PATH = 'src/Models/20180402-114759.pb'
-
-    recog_graph = tf.Graph()
-    liveness_graph = tf.Graph()
-
-    # Load The Custom Classifier
-    with open(CLASSIFIER_PATH, 'rb') as file:
-        recog_model, class_names = pickle.load(file)
-    print("Custom Classifier, Successfully loaded")
-
-    recog_sess = tf.Session(graph=recog_graph)
-    liveness_sess = tf.Session(graph=liveness_graph)
-
-    with recog_graph.as_default():
-        with recog_sess.as_default():
-            gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.6)
-            # Load the model
-            print('Loading feature extraction model')
-            facenet.load_model(FACENET_MODEL_PATH)
-
-            # Get input and output tensors
-            images_placeholder = tf.get_default_graph().get_tensor_by_name("input:0")
-            embeddings = tf.get_default_graph().get_tensor_by_name("embeddings:0")
-            phase_train_placeholder = tf.get_default_graph().get_tensor_by_name("phase_train:0")
-            embedding_size = embeddings.get_shape()[1]
-
-            pnet, rnet, onet = detect_face.create_mtcnn(
-                recog_sess, "src/align")
-
-            people_detected = set()
-            person_detected = collections.Counter()
-            recog_init = tf.local_variables_initializer()
-
-    # Load model nhan dien fake/real
-    print("[INFO] loading liveness detector...")
-    with liveness_graph.as_default():
-        with liveness_sess.as_default():
-            liveness_model = load_model(args["model"])
-            liveness_init = tf.local_variables_initializer()
-
-    le = pickle.loads(open(args["le"], "rb").read())
-    cap = VideoStream(src=0).start()
-    #cap = cv2.VideoCapture('http://192.168.1.101:4747/video')
+    #cap = VideoStream(src=0).start()
+    cap = cv2.VideoCapture('http://192.168.1.102:4747/video')
 
     while (True):
         cropped_array = []
         bb_array = []
         name_array = []
-        frame = cap.read()
+        ret, frame = cap.read()
         (h, w) = frame.shape[:2]
         frame = imutils.resize(frame, width=600)
         frame = cv2.flip(frame, 1)
@@ -96,7 +113,7 @@ def main():
         # ?===================Face Recognition=====================================
         with recog_graph.as_default():
             with recog_sess.as_default():
-                recog_sess.run(recog_init)
+                # recog_sess.run(recog_init)
                 bounding_boxes, _ = detect_face.detect_face(
                     frame, MINSIZE, pnet, rnet, onet, THRESHOLD, FACTOR)
 
@@ -147,7 +164,7 @@ def main():
         # ?===================Liveness=====================================
         with liveness_graph.as_default():
             with liveness_sess.as_default():
-                liveness_sess.run(liveness_init)
+                # liveness_sess.run(liveness_init)
                 for cropped, bb, name in zip(cropped_array, bb_array, name_array):
                     #TODO: Liveness
                     face = cv2.resize(cropped, (32, 32))
