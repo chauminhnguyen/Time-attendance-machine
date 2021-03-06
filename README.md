@@ -1,4 +1,9 @@
-### Download pretrained models
+## Time Attendance Machine
+	1. Detect Face.
+	2. Recognize Face.
+	3. Fake Sniffing.
+
+## Download pretrained models
 Put all models file into ./src/Models
 
 Link models:
